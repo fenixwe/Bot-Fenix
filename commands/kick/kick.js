@@ -1,56 +1,57 @@
-const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
-  ]
-});
+const { SlashCommandBuilder, PermissionsBitField, EmbedBuilder } = require('discord.js');
 
-const PREFIX = '!';
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Expulsa a un usuario del servidor.')
+    .addUserOption(option =>
+      option.setName('usuario')
+        .setDescription('El usuario a expulsar')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('razón')
+        .setDescription('Razón de la expulsión')
+        .setRequired(false)
+    ),
 
-client.on('messageCreate', async (message) => {
-  if (!message.content.startsWith(PREFIX) || message.author.bot) return;
+  async execute(interaction) {
+    const miembro = interaction.options.getMember('usuario');
+    const razon = interaction.options.getString('razón') || 'No se proporcionó una razón';
 
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-
-  if (command === 'kick') {
-    // Verificar permisos del autor
-    if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-      return message.reply('🚫 No tienes permisos para usar este comando.');
+    // Verifica si el usuario que ejecuta el comando tiene permisos
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
+      return interaction.reply({ content: '🚫 No tienes permisos para expulsar usuarios.', ephemeral: true });
     }
 
-    // Verificar que se haya mencionado a un usuario
-    const member = message.mentions.members.first();
-    if (!member) {
-      return message.reply('❌ Debes mencionar a un usuario para expulsarlo.');
+    // Verifica si el bot tiene permisos para expulsar
+    if (!interaction.guild.members.me.permissions.has(PermissionsBitField.Flags.KickMembers)) {
+      return interaction.reply({ content: '⚠️ No tengo permisos para expulsar usuarios.', ephemeral: true });
     }
 
-    // Verificar si se puede expulsar
-    if (!member.kickable) {
-      return message.reply('⚠️ No puedo expulsar a ese usuario.');
+    // Verifica si el usuario es expulsable
+    if (!miembro.kickable) {
+      return interaction.reply({ content: '❌ No puedo expulsar a este usuario.', ephemeral: true });
     }
 
     try {
-      await member.kick();
+      await miembro.kick(razon);
 
       const embed = new EmbedBuilder()
         .setTitle('👢 Usuario Expulsado')
-        .setColor(0xff0000)
+        .setColor(0xff9900)
         .addFields(
-          { name: 'Usuario', value: `${member.user.tag}`, inline: true },
-          { name: 'Expulsado por', value: `${message.author.tag}`, inline: true }
+          { name: 'Usuario', value: miembro.user.tag, inline: true },
+          { name: 'Expulsado por', value: interaction.user.tag, inline: true },
+          { name: 'Razón', value: razon }
         )
         .setTimestamp();
 
-      message.channel.send({ embeds: [embed] });
-    } catch (err) {
-      console.error(err);
-      message.reply('❌ Hubo un error al intentar expulsar al usuario.');
+      return interaction.reply({ embeds: [embed] });
+
+    } catch (error) {
+      console.error(error);
+      return interaction.reply({ content: '❌ Ocurrió un error al expulsar al usuario.', ephemeral: true });
     }
   }
-});
-
-client.login(process.env.TOKEN);
+};
