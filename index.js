@@ -89,7 +89,7 @@ client.on('ready', () => {
   client.user.setPresence({
     status: 'online', 
     activities: [{
-      name: 'CubeRaze.aternos.me',
+      name: 'creado por fandesoycuboogg',
       type: 4 
     }]
   });
